@@ -299,92 +299,6 @@ void loop() {
 #endif
 
   determineNextLedState();
-
-#if 0  
-  /* do the things if the jacket is close enough AND has not been reacted to yet
-     (reactivationDelay will have a value bigger than 0) */
-  if (jacketSeen[JACKET_ID_1]) {
-    if (reactivationDelayStartMs[JACKET_ID_1] == 0) {
-      reactivationDelayStartMs[JACKET_ID_1] = millis();
-  #ifdef DEBUG_READ
-      Serial.println("JACKET_1 ACTIVE");
-  #endif 
-      setNextLedState(STATE_J1_LED_WIPE_START);
-    }
-  } else {
-    if (currentLedState == STATE_LED_DONE) {
-      wipe_stc.color = 0;
-      wipe_stc.i = 0;
-      setNextLedState(STATE_J1_LOST);
-#ifdef DEBUG_READ
-      Serial.println("JACKET_1 LOST");
-#endif
-    }
-  }
-
-  if (jacketSeen[JACKET_ID_2]) {
-    if (reactivationDelayStartMs[JACKET_ID_2] == 0) {
-      reactivationDelayStartMs[JACKET_ID_2] = millis();
-  #ifdef DEBUG_READ
-      Serial.println("JACKET_2 ACTIVE");
-  #endif
-      for (int teller = 0; teller < 255; teller++) {
-        for (int i = 0; i < NUMPIXELS; i++) {
-          // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
-          strip.setPixelColor(i, strip.Color(255 - teller, 0, teller));
-          strip.show(); // This sends the updated pixel color to the hardware.
-        }
-        delay(10); // Delay for a period of time (in milliseconds).
-        broadcast(); //keep broadcasting
-      }
-      for (int i = 0; i < NUMPIXELS; i++) {
-        strip.setPixelColor(i, strip.Color(0, 0, 0)); // Moderately bright green color.
-        strip.show(); // This sends the updated pixel color to the hardware.
-      }
-  
-    } 
-  } else {
-    if (currentLedState == STATE_LED_DONE) {
-      wipe_stc.color = 0;
-      wipe_stc.i = 0;
-      setNextLedState(STATE_J2_LOST);
-#ifdef DEBUG_READ
-      Serial.println("JACKET_2 LOST");
-#endif
-    }
-  }
-
-  if (jacketSeen[JACKET_ID_3]) {
-    if (reactivationDelayStartMs[JACKET_ID_3] == 0) {
-      reactivationDelayStartMs[JACKET_ID_3] = millis();
-  #ifdef DEBUG_READ
-      Serial.println("JACKET_3 ACTIVE");
-  #endif
-     for (int teller = 0; teller < 255; teller++) {
-        for (int i = 0; i < NUMPIXELS; i++) {
-          // strip.Color takes RGB values, from 0,0,0 up to 255,255,255
-          strip.setPixelColor(i, strip.Color(0, 255 - teller, teller));
-          strip.show(); // This sends the updated pixel color to the hardware.
-        }
-        delay(10); // Delay for a period of time (in milliseconds).
-        broadcast(); //keep broadcasting
-      }
-        for (int i = 0; i < NUMPIXELS; i++) {
-          strip.setPixelColor(i, strip.Color(0,0,0)); // Moderately bright green color.
-          strip.show(); // This sends the updated pixel color to the hardware.
-      }
-    } 
-  } else {
-    if (currentLedState == STATE_LED_DONE) {
-      wipe_stc.color = 0;
-      wipe_stc.i = 0;
-      setNextLedState(STATE_J3_LOST);
-#ifdef DEBUG_READ
-      Serial.println("JACKET_3 LOST");
-#endif
-    }
-  }
-#endif  
  
   switch (currentLedState) {
     case STATE_NONE:
@@ -437,28 +351,44 @@ void loop() {
                 break;
             }
 
-            strip.setPixelColor(color_fade_stc.i++, color_fade_stc.color);
+            strip.setPixelColor(i, strip.Color(255 - color_fade_stc.i, 0, color_fade_stc.i));
             strip.show();
-            
-            if (co
 
-            if (color_fade_stc.i >= strip.numPixels()) {
-                if (wipe_stc.color == NEO_RED) {
-                    wipe_stc.color = NEO_GREEN;
-                    wipe_stc.i = 0;
-                } else if (wipe_stc.color == NEO_GREEN) {
-                    wipe_stc.color = NEO_BLUE;
-                    wipe_stc.i = 0;
-                } else {
-                    setNextLedState(STATE_LED_DONE);
-                }
+            if (color_fade_stc.i++ == 255) {
+              setNextLedState(STATE_LED_DONE);
+              break;
             }
-
+            
             color_fade_stc.start = millis();
         }
-        break;      
+        break;  
+    
     case STATE_J3_LED_WIPE_START:
+        {
+          color_fade_stc.i = 0; 
+          color_fade_stc.r = 255;
+          color_fade_stc.g = 0;
+          color_fade_stc.b = 255;
+          color_fade_stc.msdelay = 50;
+          color_fade_stc.start = millis();
+        }
     case STATE_J3_LED_WIPE_WORKING:
+        {
+            if (millis() - color_fade_stc.start < color_fade_stc.msdelay) {
+                break;
+            }
+
+            strip.setPixelColor(i, strip.Color(0, 255 - color_fade_stc.i, color_fade_stc.i));
+            strip.show();
+
+            if (color_fade_stc.i++ == 255) {
+              setNextLedState(STATE_LED_DONE);
+              break;
+            }
+            
+            color_fade_stc.start = millis();
+        }
+        break;
   
     case STATE_LED_DONE:
         break;
@@ -471,7 +401,7 @@ void loop() {
                 break;
             }
 
-            strip.setPixelColor(wipe_stc.i++, wipe_stc.color);
+            strip.setPixelColor(wipe_stc.i++, strip.Color(0, 0, 0));
             strip.show();
 
             if (wipe_stc.i >= strip.numPixels()) {
@@ -487,92 +417,3 @@ void loop() {
         setNextLedState(STATE_NONE);
   } 
 }
-
-// Fill the dots one after the other with a color
-void colorWipe(uint32_t c, uint8_t wait) {
-  for (uint16_t i = 0; i < strip.numPixels(); i++) {
-    strip.setPixelColor(i, c);
-    strip.show();
-    delay(wait);
-    broadcast();
-  }
-}
-
-void rainbow(uint8_t wait) {
-  uint16_t i, j;
-
-  for (j = 0; j < 256; j++) {
-    for (i = 0; i < strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel((i + j) & 255));
-    }
-    strip.show();
-    delay(wait);
-    broadcast();
-  }
-}
-
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) {
-  uint16_t i, j;
-
-  for (j = 0; j < 256 * 5; j++) { // 5 cycles of all colors on wheel
-    for (i = 0; i < strip.numPixels(); i++) {
-      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
-    }
-    strip.show();
-    delay(wait);
-    broadcast();
-  }
-}
-
-//Theatre-style crawling lights.
-void theaterChase(uint32_t c, uint8_t wait) {
-  for (int j = 0; j < 10; j++) { //do 10 cycles of chasing
-    for (int q = 0; q < 3; q++) {
-      for (int i = 0; i < strip.numPixels(); i = i + 3) {
-        strip.setPixelColor(i + q, c);  //turn every third pixel on
-      }
-      strip.show();
-
-      delay(wait);
-      broadcast();
-      for (int i = 0; i < strip.numPixels(); i = i + 3) {
-        strip.setPixelColor(i + q, 0);      //turn every third pixel off
-      }
-    }
-  }
-}
-
-//Theatre-style crawling lights with rainbow effect
-void theaterChaseRainbow(uint8_t wait) {
-  for (int j = 0; j < 256; j++) {   // cycle all 256 colors in the wheel
-    for (int q = 0; q < 3; q++) {
-      for (int i = 0; i < strip.numPixels(); i = i + 3) {
-        strip.setPixelColor(i + q, Wheel( (i + j) % 255)); //turn every third pixel on
-      }
-      strip.show();
-
-      delay(wait);
-      broadcast();
-      for (int i = 0; i < strip.numPixels(); i = i + 3) {
-        strip.setPixelColor(i + q, 0);      //turn every third pixel off
-      }
-    }
-  }
-}
-
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) {
-  WheelPos = 255 - WheelPos;
-  if (WheelPos < 85) {
-    return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  } else if (WheelPos < 170) {
-    WheelPos -= 85;
-    return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  } else {
-    WheelPos -= 170;
-    return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-  }
-}
-
