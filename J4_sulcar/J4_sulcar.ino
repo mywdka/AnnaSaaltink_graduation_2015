@@ -34,7 +34,7 @@
 #define BROADCAST_4_DELAY   1250   /* 1.25s */
 
 /* This delay determines after how long the jacket will react again on another jacket */
-#define REACTIVATE_DELAY    10000  /* 10s */
+#define REACTIVATE_DELAY    5000  /* 10s */
 
 /* The Received Signal Strength Indication or RSSI value on which we base
    our "proximity" detection. With each packet the RSSI value is prepended to the payload.
@@ -97,7 +97,7 @@ colorFadeStc color_fade_stc;
 wipeStc wipe_stc;
 
 //#define DEBUG_WRITE /* HOOK RX from Radio module to GND */
-#define DEBUG_READ
+//#define DEBUG_READ
 
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(16, NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
 int delayval = 50; // delay for lightshow
@@ -173,9 +173,9 @@ static void determineNextLedState(void)
       } else if (jacketSeen[JACKET_ID_3]) {
         setNextLedState(STATE_J3_LED_WIPE_START);
       }
-    } else {
+    } /* else {
       setNextLedState(STATE_J1_LOST);
-    }
+    } */
   }
 }
 
@@ -279,6 +279,7 @@ void loop() {
       if ( ! jacketSeen[packet[1]]) {
         /* if the jacket who send this message is close enough indicate we saw it */
         jacketSeen[packet[1]]  = true;
+        reactivationDelayStartMs[packet[1]] = millis();
       }
     } else {
       /* if the jacket who send this message is _not_ close enough */
@@ -291,7 +292,7 @@ void loop() {
   }
   
 #ifdef DEBUG_READ
-  for (int k=0; i<JACKET_ID_LAST; k++) {
+  for (int k=0; k<JACKET_ID_LAST; k++) {
     Serial.print("JACKET ");
     Serial.print(k+1);
     Serial.println((jacketSeen[k]) ? ": ACTIVE" : ": LOST");
@@ -302,12 +303,14 @@ void loop() {
  
   switch (currentLedState) {
     case STATE_NONE:
+        Serial.println("STATE_END");
         break;
     case STATE_J1_LED_WIPE_START:
         {
+            Serial.println("STATE_J1_LED_WIPE_START");
             wipe_stc.i = 0;
             wipe_stc.color = NEO_RED;
-            wipe_stc.msdelay = 25;
+            wipe_stc.msdelay = 50;
             wipe_stc.start = millis();
             setNextLedState(STATE_J1_LED_WIPE_WORKING);
         }
@@ -317,6 +320,7 @@ void loop() {
                 break;
             }
 
+            Serial.println("STATE_J1_LED_WIPE_WORKING");
             strip.setPixelColor(wipe_stc.i++, wipe_stc.color);
             strip.show();
             
@@ -338,20 +342,25 @@ void loop() {
       
     case STATE_J2_LED_WIPE_START:
         {
+          Serial.println("STATE_J2_LED_WIPE_START");
           color_fade_stc.i = 0; 
           color_fade_stc.r = 255;
           color_fade_stc.g = 0;
           color_fade_stc.b = 255;
           color_fade_stc.msdelay = 50;
           color_fade_stc.start = millis();
+          setNextLedState(STATE_J2_LED_WIPE_WORKING);
         }
     case STATE_J2_LED_WIPE_WORKING:
         {
             if (millis() - color_fade_stc.start < color_fade_stc.msdelay) {
                 break;
             }
-
-            strip.setPixelColor(i, strip.Color(255 - color_fade_stc.i, 0, color_fade_stc.i));
+            
+            Serial.println("STATE_J2_LED_WIPE_WORKING");
+            for (int led=0; led < strip.numPixels(); led++) {
+              strip.setPixelColor(led, strip.Color(255 - color_fade_stc.i, 0, color_fade_stc.i));
+            }
             strip.show();
 
             if (color_fade_stc.i++ == 255) {
@@ -365,20 +374,25 @@ void loop() {
     
     case STATE_J3_LED_WIPE_START:
         {
+          Serial.println("STATE_J3_LED_WIPE_START");
           color_fade_stc.i = 0; 
           color_fade_stc.r = 255;
           color_fade_stc.g = 0;
           color_fade_stc.b = 255;
           color_fade_stc.msdelay = 50;
           color_fade_stc.start = millis();
+          setNextLedState(STATE_J3_LED_WIPE_WORKING);
         }
     case STATE_J3_LED_WIPE_WORKING:
         {
             if (millis() - color_fade_stc.start < color_fade_stc.msdelay) {
                 break;
             }
-
-            strip.setPixelColor(i, strip.Color(0, 255 - color_fade_stc.i, color_fade_stc.i));
+            
+            Serial.println("STATE_J3_LED_WIPE_WORKING");
+            for (int led=0; led < strip.numPixels(); led++) {
+              strip.setPixelColor(led, strip.Color(0, 255 - color_fade_stc.i, color_fade_stc.i));
+            }
             strip.show();
 
             if (color_fade_stc.i++ == 255) {
@@ -391,6 +405,11 @@ void loop() {
         break;
   
     case STATE_LED_DONE:
+        Serial.println("STATE_LED_DONE");
+        for (int led=0; led < strip.numPixels(); led++) {
+              strip.setPixelColor(led, strip.Color(0, 0, 0));
+        }
+        strip.show();
         break;
         
     case STATE_J1_LOST:
@@ -401,6 +420,8 @@ void loop() {
                 break;
             }
 
+            Serial.println("STATE_LOST");
+            
             strip.setPixelColor(wipe_stc.i++, strip.Color(0, 0, 0));
             strip.show();
 
@@ -414,6 +435,7 @@ void loop() {
 
     case STATE_END:
     default:
+        Serial.println("STATE_END");
         setNextLedState(STATE_NONE);
   } 
 }
